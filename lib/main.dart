@@ -30,7 +30,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+
 
 
   @override
@@ -43,7 +43,7 @@ class _MyHomePageState extends State<MyHomePage> {
       floatingActionButton: FloatingActionButton(
         onPressed: (){},
         tooltip: 'Increment',
-        child: Icon(Icons.add),
+        child: Icon(Icons.arrow_back),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
