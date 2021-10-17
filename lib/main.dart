@@ -157,6 +157,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget buildSora(List<Verses> versesList) {
     return Scaffold(
+      appBar: AppBar(title: Text("temporary title")),
       body: ListView.builder(
         itemCount: versesList.length,
         itemBuilder: (BuildContext context, int index) {
@@ -165,7 +166,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ListTile(
                 title: Text(
                   versesList[index].text,
-                  style: TextStyle(fontSize: 20),
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 20,),
                 ),
                 subtitle: Text(
                   versesList[index].translation,
