@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 import 'package:quran/models/Chapters.dart';
+import 'package:quran/models/Sora.dart';
 import 'package:quran/newtork/Api.dart';
 
 void main() {
@@ -36,6 +37,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   List<Chapter> chapterList = [];
+  List<Verses> versesList = [];
 
   @override
   Widget build(BuildContext context) {
@@ -43,25 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: FutureBuilder<List<Chapter>>(
-        future: getQuranChapters(),
-        builder: (context, snapshot) {
-          ///  error
-          if (snapshot.hasError)
-            return Center(
-              child: Text(
-                'Error ${snapshot.data}', style: TextStyle(fontSize: 40, color: Colors.red),)
-            );
-          else if(snapshot.connectionState == ConnectionState.done){
-            /// if success
-            chapterList = snapshot.data!;
-            return buildListView(chapterList);
-          }else{
-            /// if waiting
-            return Center(child: CircularProgressIndicator());
-          }
-        },
-      ),
+      body: buildChapterFutureBuilder(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           getQuranChapters();
@@ -74,20 +58,76 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  FutureBuilder<List<Chapter>> buildChapterFutureBuilder() {
+    return FutureBuilder<List<Chapter>>(
+      future: getQuranChapters(),
+      builder: (context, snapshot) {
+        ///  error
+        if (snapshot.hasError)
+          return Center(
+              child: Text(
+                'Error ${snapshot.data}',
+                style: TextStyle(fontSize: 40, color: Colors.red),
+              ));
+        else if (snapshot.connectionState == ConnectionState.done) {
+          /// if success
+          chapterList = snapshot.data!;
+          return buildListView(chapterList);
+        } else {
+          /// if waiting
+          return Center(child: CircularProgressIndicator());
+        }
+      },
+    );
+  }
+
+  FutureBuilder<List<Verses>> buildVersesFutureBuilder(chapterNumber) {
+    return FutureBuilder<List<Verses>>(
+      future: getSoraVerses(chapterList[chapterNumber]),
+      builder: (context, snapshot) {
+        ///  error
+        if (snapshot.hasError)
+          return Center(
+              child: Text(
+                'Error ${snapshot.data}',
+                style: TextStyle(fontSize: 40, color: Colors.red),
+              ));
+        else if (snapshot.connectionState == ConnectionState.done) {
+          /// if success
+          versesList = snapshot.data!;
+          return buildSora(versesList);
+        } else {
+          /// if waiting
+          return Center(child: CircularProgressIndicator());
+        }
+      },
+    );
+  }
+
   Widget buildListView(List<Chapter> chapterList) {
     return ListView.builder(
       itemCount: chapterList.length,
       itemBuilder: (BuildContext context, int index) {
         return Column(
           children: [
-            ListTile(
-              title: Text(
-                chapterList[index].name,
-                style: TextStyle(fontSize: 20),
-              ),
-              subtitle: Text(
-                chapterList[index].translation,
-                style: TextStyle(fontSize: 20),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => buildVersesFutureBuilder(index),
+                  ),
+                );
+              },
+              child: ListTile(
+                title: Text(
+                  chapterList[index].name,
+                  style: TextStyle(fontSize: 20),
+                ),
+                subtitle: Text(
+                  chapterList[index].translation,
+                  style: TextStyle(fontSize: 20),
+                ),
               ),
             ),
             Divider(),
@@ -113,5 +153,49 @@ class _MyHomePageState extends State<MyHomePage> {
       // error ...
     }
     return chapterList;
+  }
+
+  Widget buildSora(List<Verses> versesList) {
+    return Scaffold(
+      body: ListView.builder(
+        itemCount: versesList.length,
+        itemBuilder: (BuildContext context, int index) {
+          return Column(
+            children: [
+              ListTile(
+                title: Text(
+                  versesList[index].text,
+                  style: TextStyle(fontSize: 20),
+                ),
+                subtitle: Text(
+                  versesList[index].translation,
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              Divider(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<List<Verses>> getSoraVerses(Chapter chapter) async {
+    var url = Uri.parse(chapter.link);
+    print('start the calling $url');
+    Response response = await http.get(url);
+    if (response.statusCode == 200) {
+      var versesJsonArray = response.body;
+      Map decode = json.decode(versesJsonArray);
+      List verseList = decode['verses'];
+      verseList.forEach((versesDictionary) {
+        Verses verses = Verses.fromJson(versesDictionary);
+        versesList.add(verses);
+      });
+    } else {
+      // error
+      debugPrint("Connection error");
+    }
+    return versesList;
   }
 }
