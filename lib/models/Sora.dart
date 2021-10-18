@@ -39,9 +39,7 @@ class Sora {
     data['translation'] = this.translation;
     data['type'] = this.type;
     data['total_verses'] = this.totalVerses;
-    if (this.verses != null) {
-      data['verses'] = this.verses.map((v) => v.toJson()).toList();
-    }
+    data['verses'] = this.verses.map((v) => v.toJson()).toList();
     return data;
   }
 }

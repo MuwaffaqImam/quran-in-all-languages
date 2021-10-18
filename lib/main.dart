@@ -66,9 +66,9 @@ class _MyHomePageState extends State<MyHomePage> {
         if (snapshot.hasError)
           return Center(
               child: Text(
-                'Error ${snapshot.data}',
-                style: TextStyle(fontSize: 40, color: Colors.red),
-              ));
+            'Error ${snapshot.data}',
+            style: TextStyle(fontSize: 40, color: Colors.red),
+          ));
         else if (snapshot.connectionState == ConnectionState.done) {
           /// if success
           chapterList = snapshot.data!;
@@ -89,9 +89,9 @@ class _MyHomePageState extends State<MyHomePage> {
         if (snapshot.hasError)
           return Center(
               child: Text(
-                'Error ${snapshot.data}',
-                style: TextStyle(fontSize: 40, color: Colors.red),
-              ));
+            'Error ${snapshot.data}',
+            style: TextStyle(fontSize: 40, color: Colors.red),
+          ));
         else if (snapshot.connectionState == ConnectionState.done) {
           /// if success
           versesList = snapshot.data!;
@@ -166,9 +166,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ListTile(
                 title: Text(
                   versesList[index].text,
-                  textDirection: TextDirection.rtl,
+                  textDirection: TextDirection.ltr,
                   textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 20,),
+                  style: TextStyle(fontSize: 20),
                 ),
                 subtitle: Text(
                   versesList[index].translation,
