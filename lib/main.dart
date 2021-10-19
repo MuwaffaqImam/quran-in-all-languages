@@ -1,11 +1,18 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
+import 'package:provider/provider.dart';
 import 'package:quran/models/Chapters.dart';
 import 'package:quran/models/Sora.dart';
 import 'package:quran/newtork/Api.dart';
+import 'package:quran/provider/VersisProvider.dart';
+import 'package:quran/translation/TranslatedText.dart';
+import 'package:quran/translation/TranslationManager.dart';
+
+import 'models/SorasScreen.dart';
 
 void main() {
   runApp(MyApp());
@@ -15,21 +22,26 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // is not restarted.
-        primarySwatch: Colors.blue,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SoraProvider>(
+            create: (context) => SoraProvider())
+      ],
+      child: MaterialApp(
+        title: 'Flutter Demo',
+        theme: ThemeData(
+          // is not restarted.
+          accentColor: Colors.amber,
+          primarySwatch: Colors.teal,
+        ),
+        home: SafeArea(child: MyHomePage()),
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+  MyHomePage({Key? key}) : super(key: key);
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -38,23 +50,95 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   List<Chapter> chapterList = [];
   List<Verses> versesList = [];
+  String translate = TranslateLanguage.RUSSIAN;
+  int index=44;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: buildChapterFutureBuilder(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          getQuranChapters();
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Finished calling')));
-        },
-        tooltip: 'Increment',
-        child: Icon(Icons.arrow_back),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    return Consumer<SoraProvider>(builder: (context, provider, child) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Quran All Languages'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    translate = TranslateLanguage.RUSSIAN;
+                  });
+                },
+                child: Center(child: Text('Russian')),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    translate = TranslateLanguage.ARABIC;
+                  });
+                },
+                child: Center(child: Text('Arabic')),
+              ),
+            ),
+          ],
+        ),
+        body: buildTranslateBuilder(),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            buildModelSheet();
+          },
+          tooltip: 'Increment',
+          child: Icon(Icons.translate),
+        ), // This trailing comma makes auto-formatting nicer for build methods.
+      );
+    });
+  }
+
+  FutureBuilder<Object> buildTranslateBuilder() {
+    return FutureBuilder(
+      // Initialize FlutterFire:
+      future: initTranslation(),
+      builder: (context, snapshot) {
+        // Check for errors
+        if (snapshot.hasError) {
+          return Text('${snapshot.error}');
+        }
+
+        // Once complete, show your application
+        if (snapshot.connectionState == ConnectionState.done) {
+          return buildChapterFutureBuilder();
+        }
+
+        // Otherwise, show something whilst waiting for initialization to complete
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Center(
+                  child: RichText(
+                    text: TextSpan(
+                      text: 'Translating.. to ${languages[index]} \n',
+                      style: TextStyle(fontSize: 30,color: Colors.black),
+                      children: const <TextSpan>[
+                        TextSpan(text: 'this might take a while... \n', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                        TextSpan(text: 'because we are downloading an AI model to translate through it,'
+                            ' once finished you will see an incredible thing, I PROMISE... \n ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        TextSpan(text: '  so say Astghefer Allah in this time time!',style: TextStyle(fontFamily: 'casual',fontSize: 30)),
+                      ],
+                    ),
+                  ),
+                ),
+                CircularProgressIndicator(),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -81,29 +165,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  FutureBuilder<List<Verses>> buildVersesFutureBuilder(chapterNumber) {
-    return FutureBuilder<List<Verses>>(
-      future: getSoraVerses(chapterList[chapterNumber]),
-      builder: (context, snapshot) {
-        ///  error
-        if (snapshot.hasError)
-          return Center(
-              child: Text(
-            'Error ${snapshot.data}',
-            style: TextStyle(fontSize: 40, color: Colors.red),
-          ));
-        else if (snapshot.connectionState == ConnectionState.done) {
-          /// if success
-          versesList = snapshot.data!;
-          return buildSora(versesList);
-        } else {
-          /// if waiting
-          return Center(child: CircularProgressIndicator());
-        }
-      },
-    );
-  }
-
   Widget buildListView(List<Chapter> chapterList) {
     return ListView.builder(
       itemCount: chapterList.length,
@@ -113,20 +174,18 @@ class _MyHomePageState extends State<MyHomePage> {
             InkWell(
               onTap: () {
                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => buildVersesFutureBuilder(index),
-                  ),
-                );
+                    context, SoraScreen.getRoute(chapterList[index]));
               },
               child: ListTile(
-                title: Text(
-                  chapterList[index].name,
-                  style: TextStyle(fontSize: 20),
+                title: Center(
+                  child: Text(
+                    chapterList[index].name,
+                    style: TextStyle(fontSize: 24),
+                  ),
                 ),
-                subtitle: Text(
+                subtitle: TranslatedText(
                   chapterList[index].translation,
-                  style: TextStyle(fontSize: 20),
+                  style: TextStyle(fontSize: 24, color: Colors.teal),
                 ),
               ),
             ),
@@ -155,50 +214,169 @@ class _MyHomePageState extends State<MyHomePage> {
     return chapterList;
   }
 
-  Widget buildSora(List<Verses> versesList) {
-    return Scaffold(
-      appBar: AppBar(title: Text("temporary title")),
-      body: ListView.builder(
-        itemCount: versesList.length,
-        itemBuilder: (BuildContext context, int index) {
-          return Column(
-            children: [
-              ListTile(
-                title: Text(
-                  versesList[index].text,
-                  textDirection: TextDirection.ltr,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 20),
-                ),
-                subtitle: Text(
-                  versesList[index].translation,
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-              Divider(),
-            ],
-          );
-        },
-      ),
+  Future<bool> initTranslation() async {
+    return await TranslationManager().init(translateToLanguage: translate);
+  }
+
+  buildModelSheet() {
+    showModalBottomSheet<void>(
+      enableDrag: true,
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 400,
+          color: Colors.amberAccent,
+          child: Center(
+            child: ListView.builder(
+              itemCount: languages.length,
+              itemBuilder: (BuildContext context, int index) {
+                return Column(
+                  children: [
+                    ListTile(
+                      onTap: () {
+                        setState(() {
+                          this.index = index;
+                          translate = la[index];
+                        });
+                        Navigator.pop(context);
+                      },
+                      title: Text(
+                        '${languages[index]}',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    Divider(),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Future<List<Verses>> getSoraVerses(Chapter chapter) async {
-    var url = Uri.parse(chapter.link);
-    print('start the calling $url');
-    Response response = await http.get(url);
-    if (response.statusCode == 200) {
-      var versesJsonArray = response.body;
-      Map decode = json.decode(versesJsonArray);
-      List verseList = decode['verses'];
-      verseList.forEach((versesDictionary) {
-        Verses verses = Verses.fromJson(versesDictionary);
-        versesList.add(verses);
-      });
-    } else {
-      // error
-      debugPrint("Connection error");
-    }
-    return versesList;
-  }
+  List<String> languages = [
+    'AFRIKAANS',
+    'ALBANIAN',
+    'ARABIC',
+    'BELARUSIAN',
+    'BENGALI',
+    'BULGARIAN',
+    'CATALAN',
+    'CHINESE',
+    'CROATIAN',
+    'CZECH',
+    'DANISH',
+    'DUTCH',
+    'ENGLISH',
+    'ESPERANTO',
+    'ESTONIAN',
+    'FINNISH',
+    'FRENCH',
+    'GALICIAN',
+    'GEORGIAN',
+    'GERMAN',
+    'GREEK',
+    'GUJARATI',
+    'HAITIAN_CREOLE',
+    'HEBREW',
+    'HINDI',
+    'HUNGARIAN',
+    'ICELANDIC',
+    'INDONESIAN',
+    'IRISH',
+    'ITALIAN',
+    'JAPANESE',
+    'KANNADA',
+    'KOREAN',
+    'LATVIAN',
+    'LITHUANIAN',
+    'MACEDONIAN',
+    'MALAY',
+    'MALTESE',
+    'MARATHI',
+    'NORWEGIAN',
+    'PERSIAN',
+    'POLISH',
+    'PORTUGUESE',
+    'ROMANIAN',
+    'RUSSIAN',
+    'SLOVAK',
+    'SLOVENIAN',
+    'SPANISH',
+    'SWAHILI',
+    'SWEDISH',
+    'TAGALOG',
+    'TAMIL',
+    'TELUGU',
+    'THAI',
+    'TURKISH',
+    'UKRAINIAN',
+    'URDU',
+    'VIETNAMESE',
+    'WELSH'
+  ];
+
+  List<String> la = [
+    "af",
+    "sq",
+    "ar",
+    "be",
+    "bn",
+    "bg",
+    "ca",
+    "zh",
+    "hr",
+    "cs",
+    "da",
+    "nl",
+    "en",
+    "eo",
+    "et",
+    "fi",
+    "fr",
+    "gl",
+    "ka",
+    "de",
+    "el",
+    "gu",
+    "ht",
+    "he",
+    "hi",
+    "hu",
+    "is",
+    "id",
+    "ga",
+    "it",
+    "ja",
+    "kn",
+    "ko",
+    "lv",
+    "lt",
+    "mk",
+    "ms",
+    "mt",
+    "mr",
+    "no",
+    "fa",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sk",
+    "sl",
+    "es",
+    "sw",
+    "sv",
+    "tl",
+    "ta",
+    "te",
+    "th",
+    "tr",
+    "uk",
+    "ur",
+    "vi",
+    "cy",
+  ];
 }
